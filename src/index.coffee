@@ -3,13 +3,15 @@ path = require 'path'
 gutil = require 'gulp-util'
 through = require 'through2'
 
-module.exports = ->
+module.exports = (opt = {}) ->
 	got = {}
 	scanned = {}
 	through.obj (file, enc, next) ->
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'File can\'t be null') if file.isNull()
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'Streams not supported') if file.isStream()
 		return next() if scanned[file.path]
+		if opt.excludeDependent
+			got[file.path] = 1
 		scanned[file.path] = 1
 		deps = []
 		content = file.contents.toString 'utf-8'
@@ -25,14 +27,16 @@ module.exports = ->
 			got[dep] = 1
 		deps.forEach (filePath) =>
 			if not (/\.tpl\.html$/).test filePath
-				filePath = filePath + '.js'
-			if fs.existsSync filePath
-				newFile = new gutil.File
-					base: file.base
-					cwd: file.cwd
-					path: filePath
-					contents: fs.readFileSync filePath
-				@push newFile
-				if not scanned[filePath]
-					@write newFile
+				if fs.existsSync filePath + '.coffee'
+					filePath = filePath + '.coffee'
+				else
+					filePath = filePath + '.js'
+			newFile = new gutil.File
+				base: file.base
+				cwd: file.cwd
+				path: filePath
+				contents: fs.readFileSync filePath
+			@push newFile
+			if not scanned[filePath]
+				@write newFile
 		next()
