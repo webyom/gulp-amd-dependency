@@ -13,7 +13,7 @@ module.exports = (opt = {}) ->
 		if opt.excludeDependent
 			got[file.path] = 1
 		deps = []
-		content = file.contents.toString 'utf-8'
+		content = file.contents.toString()
 		depArr = content.match /(?:^|[^.]+?)\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
 		depArr = depArr && depArr[1]
 		depArr && depArr.replace /(["'])(\.[^"']+?)\1/mg, (full, quote, dep) ->
