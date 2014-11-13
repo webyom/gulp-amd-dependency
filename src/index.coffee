@@ -32,11 +32,12 @@ module.exports = (opt = {}) ->
 		async.eachSeries(
 			deps
 			(filePath, cb) =>
-				if not (/\.tpl\.html$/).test filePath
-					if fs.existsSync filePath + '.coffee'
-						filePath = filePath + '.coffee'
-					else
-						filePath = filePath + '.js'
+				if fs.existsSync filePath
+					filePath = filePath
+				else if fs.existsSync filePath + '.coffee'
+					filePath = filePath + '.coffee'
+				else
+					filePath = filePath + '.js'
 				newFile = new gutil.File
 					base: file.base
 					cwd: file.cwd
