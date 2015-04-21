@@ -25,18 +25,18 @@ module.exports = (opt = {}) ->
 			got[file.path] = 1
 		deps = []
 		content = file.contents.toString()
-		depArr = content.match /(?:^|[^.]+?)\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
+		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
 		depArr = depArr && depArr[1]
 		depArr && depArr.replace /(["'])(\.[^"']+?)\1/mg, (full, quote, dep) ->
 			dep = path.resolve path.dirname(file.path), dep
 			got[dep] || deps.push dep
 			got[dep] = 1
-		content.replace /(?:^|[^.]+?)\brequire\s*\(\s*(["'])(\.[^"']+?)\1\s*\)/g, (full, quote, dep) ->
+		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])(\.[^"']+?)\1\s*\)/g, (full, quote, dep) ->
 			dep = path.resolve path.dirname(file.path), dep
 			got[dep] || deps.push dep
 			got[dep] = 1
 		if path.extname(file.path) is '.coffee'
-			content.replace /(?:^|[^.]+?)\brequire\s+(["'])(\.[^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
+			content.replace /(?:^|[^.])\brequire\s+(["'])(\.[^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
 				dep = path.resolve path.dirname(file.path), dep
 				got[dep] || deps.push dep
 				got[dep] = 1
