@@ -25,6 +25,9 @@ module.exports = (opt = {}) ->
 			got[file.path] = 1
 		deps = []
 		content = file.contents.toString()
+		if (/(\.riot\.html|\.tag)$/).test file.path
+			m = content.match /(?:^|\r\n|\n|\r)\/\*\*\s*@riot\s+(coffeescript|es6)/
+			riotType = m?[1]
 		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
 		depArr = depArr && depArr[1]
 		depArr && depArr.replace /(["'])(\.[^"']+?)\1/mg, (full, quote, dep) ->
@@ -35,7 +38,7 @@ module.exports = (opt = {}) ->
 			dep = path.resolve path.dirname(file.path), dep
 			got[dep] || deps.push dep
 			got[dep] = 1
-		if path.extname(file.path) is '.coffee'
+		if path.extname(file.path) is '.coffee' or riotType is 'coffeescript'
 			content.replace /(?:^|[^.])\brequire\s+(["'])(\.[^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
 				dep = path.resolve path.dirname(file.path), dep
 				got[dep] || deps.push dep
