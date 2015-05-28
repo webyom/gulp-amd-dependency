@@ -52,6 +52,8 @@ module.exports = (opt = {}) ->
 					filePath = filePath + '.coffee'
 				else if fs.existsSync filePath + '.js'
 					filePath = filePath + '.js'
+				else if fs.existsSync filePath + '.jsx'
+					filePath = filePath + '.jsx'
 				else if fs.existsSync filePath + '.tag'
 					filePath = filePath + '.tag'
 				else if fs.existsSync filePath + '.riot.html'
