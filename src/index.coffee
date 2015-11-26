@@ -79,7 +79,7 @@ module.exports = (opt = {}) ->
 						path: filePath
 						contents: newFileContent
 					newFile._isRelative = true
-				else if filePath.indexOf('/') isnt 0 and filePath not in ['!require', '!exports', '!module', 'global'] and not opt.onlyRelative
+				else if not opt.onlyRelative and filePath.indexOf('/') isnt 0 and filePath not in ['!require', '!exports', '!module', 'global']
 					newFile = new gutil.File
 						base: file.base
 						cwd: file.cwd
