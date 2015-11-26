@@ -13,7 +13,7 @@ gulp.task 'example', ->
 	gulp.src('example/src/index.js')
 		.pipe amdDependency()
 		.pipe through.obj (file, enc, cb) ->
-			console.log file.path
+			console.log file.path, file._isRelative
 			cb()
 
 gulp.task 'default', ['compile']

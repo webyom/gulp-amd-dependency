@@ -1,4 +1,5 @@
 define(['require', 'exports', 'module', './mod-a'], function(require, exports, module, modA) {
+	var $ = require('jquery');
 	var modB = require('./mod-b');
 	var tplA = require('./inline-tpl-a.tpl.html');
 	var tplB = require('./inline-tpl-b.tpl.html');

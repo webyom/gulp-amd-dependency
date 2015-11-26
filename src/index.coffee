@@ -30,56 +30,77 @@ module.exports = (opt = {}) ->
 			riotType = m?[1]
 		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
 		depArr = depArr && depArr[1]
-		depArr && depArr.replace /(["'])(\.[^"']+?)\1/mg, (full, quote, dep) ->
-			dep = path.resolve path.dirname(file.path), dep
+		depArr && depArr.replace /(["'])([^"']+?)\1/mg, (full, quote, dep) ->
+			if dep.indexOf('.') is 0
+				dep = path.resolve path.dirname(file.path), dep
+			else
+				dep = '!' + dep
 			got[dep] || deps.push dep
 			got[dep] = 1
-		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])(\.[^"']+?)\1\s*\)/g, (full, quote, dep) ->
-			dep = path.resolve path.dirname(file.path), dep
+		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])([^"']+?)\1\s*\)/g, (full, quote, dep) ->
+			if dep.indexOf('.') is 0
+				dep = path.resolve path.dirname(file.path), dep
+			else
+				dep = '!' + dep
 			got[dep] || deps.push dep
 			got[dep] = 1
 		if path.extname(file.path) is '.coffee' or riotType is 'coffeescript'
-			content.replace /(?:^|[^.])\brequire\s+(["'])(\.[^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
-				dep = path.resolve path.dirname(file.path), dep
+			content.replace /(?:^|[^.])\brequire\s+(["'])([^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
+				if dep.indexOf('.') is 0
+					dep = path.resolve path.dirname(file.path), dep
+				else
+					dep = '!' + dep
 				got[dep] || deps.push dep
 				got[dep] = 1
 		async.eachSeries(
 			deps
 			(filePath, cb) =>
-				if fs.existsSync filePath
-					filePath = filePath
-				else if fs.existsSync filePath + '.coffee'
-					filePath = filePath + '.coffee'
-				else if fs.existsSync filePath + '.js'
-					filePath = filePath + '.js'
-				else if fs.existsSync filePath + '.jsx'
-					filePath = filePath + '.jsx'
-				else if fs.existsSync filePath + '.tag'
-					filePath = filePath + '.tag'
-				else if fs.existsSync filePath + '.riot.html'
-					filePath = filePath + '.riot.html'
+				if filePath.indexOf('!') isnt 0
+					if fs.existsSync filePath
+						filePath = filePath
+					else if fs.existsSync filePath + '.coffee'
+						filePath = filePath + '.coffee'
+					else if fs.existsSync filePath + '.js'
+						filePath = filePath + '.js'
+					else if fs.existsSync filePath + '.jsx'
+						filePath = filePath + '.jsx'
+					else if fs.existsSync filePath + '.tag'
+						filePath = filePath + '.tag'
+					else if fs.existsSync filePath + '.riot.html'
+						filePath = filePath + '.riot.html'
+					else
+						filePath = filePath
+						templateName = path.relative path.dirname(file.path), filePath
+						newFileContent = getInlineTemplate content, templateName
+					newFileContent ?= fs.readFileSync filePath
+					newFile = new gutil.File
+						base: file.base
+						cwd: file.cwd
+						path: filePath
+						contents: newFileContent
+					newFile._isRelative = true
+				else if filePath.indexOf('/') isnt 0 and filePath not in ['!require', '!exports', '!module', 'global'] and not opt.onlyRelative
+					newFile = new gutil.File
+						base: file.base
+						cwd: file.cwd
+						path: filePath.slice 1
+						contents: ''
+					newFile._isRelative = false
+				if newFile
+					@push newFile
+					if filePath isnt file.path and filePath.indexOf('!') isnt 0
+						depStream = module.exports opt
+						depStream.pipe through.obj(
+							(file, enc, next) =>
+								@push file
+								next()
+							->
+								cb()
+						)
+						depStream.end newFile
+					else 
+						cb()
 				else
-					filePath = filePath
-					templateName = path.relative path.dirname(file.path), filePath
-					newFileContent = getInlineTemplate content, templateName
-				newFileContent ?= fs.readFileSync filePath
-				newFile = new gutil.File
-					base: file.base
-					cwd: file.cwd
-					path: filePath
-					contents: newFileContent
-				@push newFile
-				if filePath isnt file.path
-					depStream = module.exports opt
-					depStream.pipe through.obj(
-						(file, enc, next) =>
-							@push file
-							next()
-						->
-							cb()
-					)
-					depStream.end newFile
-				else 
 					cb()
 			(err) =>
 				return @emit 'error', new gutil.PluginError('gulp-amd-dependency', err) if err
