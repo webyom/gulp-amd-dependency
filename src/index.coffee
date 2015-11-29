@@ -58,10 +58,12 @@ module.exports = (opt = {}) ->
 				if filePath.indexOf('!') isnt 0
 					if fs.existsSync filePath
 						filePath = filePath
-					else if fs.existsSync filePath + '.coffee'
-						filePath = filePath + '.coffee'
 					else if fs.existsSync filePath + '.js'
 						filePath = filePath + '.js'
+					else if fs.existsSync filePath + '.es6'
+						filePath = filePath + '.es6'
+					else if fs.existsSync filePath + '.coffee'
+						filePath = filePath + '.coffee'
 					else if fs.existsSync filePath + '.jsx'
 						filePath = filePath + '.jsx'
 					else if fs.existsSync filePath + '.tag'
