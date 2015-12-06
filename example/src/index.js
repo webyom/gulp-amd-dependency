@@ -2,6 +2,7 @@ define(['require', 'exports', 'module', './mod-a'], function(require, exports, m
 	var $ = require('jquery');
 	var modB = require('./mod-b');
 	var modF = require('./mod-f');
+	var modG = require('./mod-g');
 	var tplA = require('./inline-tpl-a.tpl.html');
 	var tplB = require('./inline-tpl-b.tpl.html');
 	var riot = require('./riot');

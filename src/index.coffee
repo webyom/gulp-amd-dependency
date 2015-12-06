@@ -4,6 +4,8 @@ async = require 'async'
 gutil = require 'gulp-util'
 through = require 'through2'
 
+EXTNAMES = ['.js', '.es6', '.coffee', '.ts', '.jsx', '.tag', '.riot.html']
+
 getInlineTemplate = (content, templateName) ->
 	content = content.split(/(?:\r\n|\n|\r)__END__\s*(?:\r\n|\n|\r)+/)[1]
 	if content
@@ -56,24 +58,16 @@ module.exports = (opt = {}) ->
 			deps
 			(filePath, cb) =>
 				if filePath.indexOf('!') isnt 0
-					if fs.existsSync filePath
-						filePath = filePath
-					else if fs.existsSync filePath + '.js'
-						filePath = filePath + '.js'
-					else if fs.existsSync filePath + '.es6'
-						filePath = filePath + '.es6'
-					else if fs.existsSync filePath + '.coffee'
-						filePath = filePath + '.coffee'
-					else if fs.existsSync filePath + '.jsx'
-						filePath = filePath + '.jsx'
-					else if fs.existsSync filePath + '.tag'
-						filePath = filePath + '.tag'
-					else if fs.existsSync filePath + '.riot.html'
-						filePath = filePath + '.riot.html'
-					else
-						filePath = filePath
-						templateName = path.relative path.dirname(file.path), filePath
-						newFileContent = getInlineTemplate content, templateName
+					if not fs.existsSync filePath
+						extnames =  (opt.extnames || EXTNAMES).concat()
+						found = false
+						while not found and extname = extnames.shift()
+							if fs.existsSync filePath + extname
+								filePath = filePath + extname
+								found = true
+						if not found
+							templateName = path.relative path.dirname(file.path), filePath
+							newFileContent = getInlineTemplate content, templateName
 					newFileContent ?= fs.readFileSync filePath
 					newFile = new gutil.File
 						base: file.base
@@ -81,7 +75,7 @@ module.exports = (opt = {}) ->
 						path: filePath
 						contents: newFileContent
 					newFile._isRelative = true
-				else if not opt.onlyRelative and filePath.indexOf('/') isnt 0 and filePath not in ['!require', '!exports', '!module', 'global']
+				else if not opt.onlyRelative and filePath.indexOf('/') isnt 0 and filePath not in ['!require', '!exports', '!module', '!global']
 					newFile = new gutil.File
 						base: file.base
 						cwd: file.cwd
