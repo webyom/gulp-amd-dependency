@@ -4,7 +4,7 @@ async = require 'async'
 gutil = require 'gulp-util'
 through = require 'through2'
 
-EXTNAMES = ['.js', '.es6', '.coffee', '.ts', '.jsx', '.tag', '.riot.html']
+EXTNAMES = ['.js', '.es6', '.coffee', '.jsx', '.tag', '.riot.html']
 
 getInlineTemplate = (content, templateName) ->
 	content = content.split(/(?:\r\n|\n|\r)__END__\s*(?:\r\n|\n|\r)+/)[1]
