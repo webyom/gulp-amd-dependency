@@ -58,7 +58,7 @@ module.exports = (opt = {}) ->
 			deps
 			(filePath, cb) =>
 				if filePath.indexOf('!') isnt 0
-					if not fs.existsSync filePath
+					if not fs.existsSync(filePath) or fs.lstatSync(filePath).isDirectory()
 						extnames =  (opt.extnames || EXTNAMES).concat()
 						found = false
 						while not found and extname = extnames.shift()
