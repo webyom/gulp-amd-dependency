@@ -6,7 +6,10 @@ through = require 'through2'
 
 EXTNAMES = ['.js', '.es6', '.coffee', '.jsx', '.tag', '.riot.html']
 
-getInlineTemplate = (content, templateName) ->
+_isRelative = (dep) ->
+	dep.indexOf('.') is 0
+
+_getInlineTemplate = (content, templateName) ->
 	content = content.split(/(?:\r\n|\n|\r)__END__\s*(?:\r\n|\n|\r)+/)[1]
 	if content
 		content = content.split(/(?:^|\r\n|\n|\r)@@/)
@@ -20,6 +23,11 @@ getInlineTemplate = (content, templateName) ->
 module.exports = (opt = {}) ->
 	opt._got ?= {}
 	got = opt._got
+	isRelative = (dep) ->
+		res = _isRelative(dep)
+		if opt.isRelative
+			res = opt.isRelative dep, res
+		res
 	through.obj (file, enc, next) ->
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'File can\'t be null') if file.isNull()
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'Streams not supported') if file.isStream()
@@ -33,14 +41,14 @@ module.exports = (opt = {}) ->
 		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
 		depArr = depArr && depArr[1]
 		depArr && depArr.replace /(["'])([^"']+?)\1/mg, (full, quote, dep) ->
-			if dep.indexOf('.') is 0
+			if isRelative dep
 				dep = path.resolve path.dirname(file.path), dep
 			else
 				dep = '!' + dep
 			got[dep] || deps.push dep
 			got[dep] = 1
 		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])([^"']+?)\1\s*\)/g, (full, quote, dep) ->
-			if dep.indexOf('.') is 0
+			if isRelative dep
 				dep = path.resolve path.dirname(file.path), dep
 			else
 				dep = '!' + dep
@@ -48,7 +56,7 @@ module.exports = (opt = {}) ->
 			got[dep] = 1
 		if path.extname(file.path) is '.coffee' or riotType is 'coffeescript'
 			content.replace /(?:^|[^.])\brequire\s+(["'])([^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
-				if dep.indexOf('.') is 0
+				if isRelative dep
 					dep = path.resolve path.dirname(file.path), dep
 				else
 					dep = '!' + dep
@@ -67,7 +75,7 @@ module.exports = (opt = {}) ->
 								found = true
 						if not found
 							templateName = path.relative path.dirname(file.path), filePath
-							newFileContent = getInlineTemplate content, templateName
+							newFileContent = _getInlineTemplate content, templateName
 					newFileContent ?= fs.readFileSync filePath
 					newFile = new gutil.File
 						base: file.base
