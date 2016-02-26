@@ -23,10 +23,10 @@ _getInlineTemplate = (content, templateName) ->
 module.exports = (opt = {}) ->
 	opt._got ?= {}
 	got = opt._got
-	isRelative = (dep) ->
+	isRelative = (dep, reqFilePath) ->
 		res = _isRelative(dep)
 		if opt.isRelative
-			res = opt.isRelative dep, res
+			res = opt.isRelative dep, res, reqFilePath
 		res
 	through.obj (file, enc, next) ->
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'File can\'t be null') if file.isNull()
@@ -41,14 +41,14 @@ module.exports = (opt = {}) ->
 		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
 		depArr = depArr && depArr[1]
 		depArr && depArr.replace /(["'])([^"']+?)\1/mg, (full, quote, dep) ->
-			if isRelative dep
+			if isRelative dep, file.path
 				dep = path.resolve path.dirname(file.path), dep
 			else
 				dep = '!' + dep
 			got[dep] || deps.push dep
 			got[dep] = 1
 		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])([^"']+?)\1\s*\)/g, (full, quote, dep) ->
-			if isRelative dep
+			if isRelative dep, file.path
 				dep = path.resolve path.dirname(file.path), dep
 			else
 				dep = '!' + dep
@@ -56,7 +56,7 @@ module.exports = (opt = {}) ->
 			got[dep] = 1
 		if path.extname(file.path) is '.coffee' or riotType is 'coffeescript'
 			content.replace /(?:^|[^.])\brequire\s+(["'])([^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
-				if isRelative dep
+				if isRelative dep, file.path
 					dep = path.resolve path.dirname(file.path), dep
 				else
 					dep = '!' + dep
