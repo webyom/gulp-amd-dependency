@@ -38,8 +38,8 @@ module.exports = (opt = {}) ->
 		if (/(\.riot\.html|\.tag)$/).test file.path
 			m = content.match /(?:^|\r\n|\n|\r)\/\*\*\s*@riot\s+(coffeescript|es6)/
 			riotType = m?[1]
-		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(?|\s+)[^\[\{]*(\[[^\[\]]*\])/m
-		depArr = depArr && depArr[1]
+		depArr = content.match /(?:^|[^.])\bdefine(?:\s*\(\s*|\s+)(?:(["'])[^"']+?\1\s*,\s*)*(\[[^\[\]]*\])/m
+		depArr = depArr && depArr[2]
 		depArr && depArr.replace /(["'])([^"']+?)\1/mg, (full, quote, dep) ->
 			if isRelative dep, file.path
 				dep = path.resolve path.dirname(file.path), dep
