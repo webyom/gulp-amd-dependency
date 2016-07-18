@@ -1,5 +1,7 @@
+_ = require 'lodash'
 fs = require 'fs'
 path = require 'path'
+glob = require 'glob'
 async = require 'async'
 gutil = require 'gulp-util'
 through = require 'through2'
@@ -28,11 +30,17 @@ module.exports = (opt = {}) ->
 		if opt.isRelative
 			res = opt.isRelative dep, res, reqFilePath
 		res
+	setGot = (p) ->
+		got[p] = 1
+		extnames = (opt.extnames || EXTNAMES).concat()
+		for extname in extnames
+			got[p + extname] = 1
 	through.obj (file, enc, next) ->
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'File can\'t be null') if file.isNull()
 		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'Streams not supported') if file.isStream()
+		dirname = path.dirname(file.path)
 		if opt.excludeDependent
-			got[file.path] = 1
+			setGot file.path
 		deps = []
 		content = file.contents.toString()
 		if (/(\.riot\.html|\.tag)$/).test file.path
@@ -42,39 +50,47 @@ module.exports = (opt = {}) ->
 		depArr = depArr && depArr[2]
 		depArr && depArr.replace /(["'])([^"']+?)\1/mg, (full, quote, dep) ->
 			if isRelative dep, file.path
-				dep = path.resolve path.dirname(file.path), dep
+				dep = path.resolve dirname, dep
 			else
 				dep = '!' + dep
 			got[dep] || deps.push dep
-			got[dep] = 1
-		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])([^"']+?)\1\s*\)/g, (full, quote, dep) ->
+			setGot dep
+		handleRequire = (full, quote, dep) ->
 			if isRelative dep, file.path
-				dep = path.resolve path.dirname(file.path), dep
+				if dep.indexOf('*') is -1
+					dep = path.resolve dirname, dep
+				else if not got[dep]
+					tmp = glob.sync dep, cwd: dirname
+					for p in tmp
+						p = path.resolve dirname, p
+						if not fs.statSync(p).isDirectory()
+							got[p] || deps.push p
+							extnames = (opt.extnames || EXTNAMES).concat()
+							for extname in extnames
+								if _.endsWith p, extname
+									setGot p.slice 0, -extname.length
+							setGot p
 			else
 				dep = '!' + dep
-			got[dep] || deps.push dep
-			got[dep] = 1
+			if not got[dep] and dep.indexOf('*') is -1
+				deps.push dep
+			setGot dep
+		content.replace /(?:^|[^.])\brequire\s*\(\s*(["'])([^"']+?)\1\s*\)/g, handleRequire
 		if path.extname(file.path) is '.coffee' or riotType is 'coffeescript'
-			content.replace /(?:^|[^.])\brequire\s+(["'])([^"'#]+?)\1\s*(?:\r|\n)/g, (full, quote, dep) ->
-				if isRelative dep, file.path
-					dep = path.resolve path.dirname(file.path), dep
-				else
-					dep = '!' + dep
-				got[dep] || deps.push dep
-				got[dep] = 1
+			content.replace /(?:^|[^.])\brequire\s+(["'])([^"'#]+?)\1\s*(?:\r|\n)/g, handleRequire
 		async.eachSeries(
 			deps
 			(filePath, cb) =>
 				if filePath.indexOf('!') isnt 0
 					if not fs.existsSync(filePath) or fs.statSync(filePath).isDirectory()
-						extnames =  (opt.extnames || EXTNAMES).concat()
+						extnames = (opt.extnames || EXTNAMES).concat()
 						found = false
 						while not found and extname = extnames.shift()
 							if fs.existsSync filePath + extname
 								filePath = filePath + extname
 								found = true
 						if not found
-							templateName = path.relative path.dirname(file.path), filePath
+							templateName = path.relative dirname, filePath
 							newFileContent = _getInlineTemplate content, templateName
 					newFileContent ?= fs.readFileSync filePath
 					newFile = new gutil.File
@@ -102,7 +118,7 @@ module.exports = (opt = {}) ->
 								cb()
 						)
 						depStream.end newFile
-					else 
+					else
 						cb()
 				else
 					cb()
