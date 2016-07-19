@@ -1,6 +1,6 @@
 {
   "name": "gulp-amd-dependency",
-  "version": "0.1.15",
+  "version": "0.2.0",
   "description": "Find out depended AMD module files by a AMD module file.",
   "keywords": [
     "amd",

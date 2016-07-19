@@ -6,7 +6,7 @@ async = require 'async'
 gutil = require 'gulp-util'
 through = require 'through2'
 
-EXTNAMES = ['.js', '.es6', '.coffee', '.jsx', '.tag', '.riot.html']
+EXTNAMES = ['.js', '.coffee', '.jsx', '.tag', '.riot.html']
 
 _isRelative = (dep) ->
 	dep.indexOf('.') is 0
