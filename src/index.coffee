@@ -3,10 +3,11 @@ fs = require 'fs'
 path = require 'path'
 glob = require 'glob'
 async = require 'async'
-gutil = require 'gulp-util'
+Vinyl = require 'vinyl'
+PluginError = require 'plugin-error'
 through = require 'through2'
 
-EXTNAMES = ['.js', '.coffee', '.jsx', '.tag', '.riot.html']
+EXTNAMES = ['.js', '.es6', '.coffee', '.jsx', '.tag', '.riot.html']
 
 _isRelative = (dep) ->
 	dep.indexOf('.') is 0
@@ -36,8 +37,8 @@ module.exports = (opt = {}) ->
 		for extname in extnames
 			got[p + extname] = 1
 	through.obj (file, enc, next) ->
-		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'File can\'t be null') if file.isNull()
-		return @emit 'error', new gutil.PluginError('gulp-amd-dependency', 'Streams not supported') if file.isStream()
+		return @emit 'error', new PluginError('gulp-amd-dependency', 'File can\'t be null') if file.isNull()
+		return @emit 'error', new PluginError('gulp-amd-dependency', 'Streams not supported') if file.isStream()
 		dirname = path.dirname(file.path)
 		if opt.excludeDependent
 			setGot file.path
@@ -93,14 +94,14 @@ module.exports = (opt = {}) ->
 							templateName = path.relative dirname, filePath
 							newFileContent = _getInlineTemplate content, templateName
 					newFileContent ?= fs.readFileSync filePath
-					newFile = new gutil.File
+					newFile = new Vinyl
 						base: file.base
 						cwd: file.cwd
 						path: filePath
 						contents: newFileContent
 					newFile._isRelative = true
 				else if not opt.onlyRelative and filePath.indexOf('/') isnt 0 and filePath not in ['!require', '!exports', '!module', '!global']
-					newFile = new gutil.File
+					newFile = new Vinyl
 						base: file.base
 						cwd: file.cwd
 						path: filePath.slice 1
@@ -123,6 +124,6 @@ module.exports = (opt = {}) ->
 				else
 					cb()
 			(err) =>
-				return @emit 'error', new gutil.PluginError('gulp-amd-dependency', err) if err
+				return @emit 'error', new PluginError('gulp-amd-dependency', err) if err
 				next()
 		)
