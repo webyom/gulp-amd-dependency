@@ -7,8 +7,11 @@ gulp.task 'compile', ->
 		.pipe gulp.dest('lib')
 
 gulp.task 'example', ->
-	amdDependency = require './lib/index'
 	through = require 'through2'
+	amdDependency = require './lib/index'
+
+	amdDependency.findPackageDependencies({base: 'package-dependencies'}).pipe gulp.dest 'example/package-dependencies'
+
 	console.log '"example/src/index.js" depends on:'
 	gulp.src('example/src/index.js')
 		.pipe amdDependency

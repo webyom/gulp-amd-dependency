@@ -127,3 +127,58 @@ module.exports = (opt = {}) ->
 				return @emit 'error', new PluginError('gulp-amd-dependency', err) if err
 				next()
 		)
+
+module.exports.findPackageDependencies = (opt = {}) ->
+	paths = require './paths'
+	stream = through.obj (file, enc, next) ->
+		@push file
+		next()
+	pathMap = {}
+	cwd = process.cwd()
+	pkg = require path.resolve 'package.json'
+	Object.keys(pkg.dependencies || []).forEach (dep) ->
+		depDir = path.resolve 'node_modules', dep
+		if fs.statSync(depDir).isDirectory()
+			depPkg = require path.resolve(depDir, 'package.json')
+			depFile = ''
+			if opt.paths && opt.paths[dep]
+				if typeof opt.paths[dep] is 'function'
+					depFile = path.resolve depDir, opt.paths[dep]()
+				else
+					depFile = path.resolve depDir, opt.paths[dep]
+				depFile = depFile + '.js'
+			else if paths[dep]
+				if typeof paths[dep] is 'function'
+					depFile = path.resolve depDir, paths[dep]()
+				else
+					depFile = path.resolve depDir, paths[dep]
+				depFile = depFile + '.js'
+			else if depPkg.browser and typeof depPkg.browser is 'string'
+				depFile = path.resolve depDir, depPkg.browser
+				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
+					depFile = depFile + '.js'
+			else if fs.existsSync path.resolve(depDir, 'dist', dep + '.js')
+				depFile = path.resolve(depDir, 'dist', dep + '.js')
+			else if depPkg.main and typeof depPkg.main is 'string'
+				depFile = path.resolve depDir, depPkg.main
+				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
+					depFile = depFile + '.js'
+			else if fs.existsSync path.resolve(depDir, dep + '.js')
+				depFile = path.resolve(depDir, dep + '.js')
+			else if fs.existsSync path.resolve(depDir, 'index.js')
+				depFile = path.resolve(depDir, 'index.js')
+			if depFile
+				newFile = new Vinyl
+					base: path.resolve 'node_modules'
+					cwd: cwd
+					path: depFile
+					contents: fs.readFileSync depFile
+				pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+				stream.push newFile
+	newFile = new Vinyl
+		base: cwd
+		cwd: cwd
+		path: path.join cwd, 'package-dependencies-paths.js'
+		contents: new Buffer 'var __package_dependencies_paths = ' + JSON.stringify(pathMap, null, 2) + ';'
+	stream.end newFile
+	stream
