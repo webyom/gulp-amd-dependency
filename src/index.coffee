@@ -170,11 +170,22 @@ module.exports.findPackageDependencies = (opt = {}) ->
 			else if fs.existsSync path.resolve(depDir, 'index.js')
 				depFile = path.resolve(depDir, 'index.js')
 			if depFile and path.extname(depFile) is '.js' 
+				contents = fs.readFileSync(depFile).toString()
+				sourceMap = contents.match /\/\/\s*#\s*sourceMappingURL=(.+)/
+				depFileDir = path.dirname depFile
+				sourceMapPath = sourceMap && path.resolve(depFileDir, sourceMap[1].trim())
+				sourceMapFile = null
+				if sourceMapPath and fs.existsSync(sourceMapPath) and (!opt.flatten or depFileDir is path.dirname(sourceMapPath))
+					sourceMapFile = new Vinyl
+						base: path.resolve 'node_modules'
+						cwd: cwd
+						path: if opt.flatten then path.join(depDir, path.basename(sourceMapPath)) else sourceMapPath
+						contents: fs.readFileSync sourceMapPath
 				newFile = new Vinyl
 					base: path.resolve 'node_modules'
 					cwd: cwd
 					path: depFile
-					contents: fs.readFileSync depFile
+					contents: new Buffer contents
 				if opt.flatten
 					originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 					newFile.path = path.join depDir, path.basename(depFile)
@@ -182,6 +193,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 				else
 					originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 				stream.push newFile
+				stream.push sourceMapFile if sourceMapFile
 	newFile = new Vinyl
 		base: cwd
 		cwd: cwd
