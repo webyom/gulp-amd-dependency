@@ -10,7 +10,13 @@ gulp.task 'example', ->
 	through = require 'through2'
 	amdDependency = require './lib/index'
 
-	amdDependency.findPackageDependencies({base: 'package-dependencies'}).pipe gulp.dest 'example/package-dependencies'
+	amdDependency.findPackageDependencies({
+		flatten: true
+		base: 'package-dependencies'
+		ignore: ['amd-paths-collection']
+		paths:
+			'async': 'support/sync-package-managers'
+	}).pipe gulp.dest 'example/package-dependencies'
 
 	console.log '"example/src/index.js" depends on:'
 	gulp.src('example/src/index.js')

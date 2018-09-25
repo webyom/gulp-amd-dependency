@@ -6,6 +6,7 @@ async = require 'async'
 Vinyl = require 'vinyl'
 PluginError = require 'plugin-error'
 through = require 'through2'
+amdPathsCollection = require 'amd-paths-collection'
 
 EXTNAMES = ['.js', '.es6', '.coffee', '.jsx', '.tag', '.riot.html']
 
@@ -129,7 +130,6 @@ module.exports = (opt = {}) ->
 		)
 
 module.exports.findPackageDependencies = (opt = {}) ->
-	paths = require './paths'
 	stream = through.obj (file, enc, next) ->
 		@push file
 		next()
@@ -137,6 +137,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 	cwd = process.cwd()
 	pkg = require path.resolve 'package.json'
 	Object.keys(pkg.dependencies || []).forEach (dep) ->
+		return if opt.ignore && opt.ignore.indexOf(dep) >= 0
 		depDir = path.resolve 'node_modules', dep
 		if fs.statSync(depDir).isDirectory()
 			depPkg = require path.resolve(depDir, 'package.json')
@@ -147,11 +148,11 @@ module.exports.findPackageDependencies = (opt = {}) ->
 				else
 					depFile = path.resolve depDir, opt.paths[dep]
 				depFile = depFile + '.js'
-			else if paths[dep]
-				if typeof paths[dep] is 'function'
-					depFile = path.resolve depDir, paths[dep]()
+			else if amdPathsCollection[dep]
+				if typeof amdPathsCollection[dep] is 'function'
+					depFile = path.resolve depDir, amdPathsCollection[dep]()
 				else
-					depFile = path.resolve depDir, paths[dep]
+					depFile = path.resolve depDir, amdPathsCollection[dep]
 				depFile = depFile + '.js'
 			else if depPkg.browser and typeof depPkg.browser is 'string'
 				depFile = path.resolve depDir, depPkg.browser
@@ -167,11 +168,11 @@ module.exports.findPackageDependencies = (opt = {}) ->
 				depFile = path.resolve(depDir, dep + '.js')
 			else if fs.existsSync path.resolve(depDir, 'index.js')
 				depFile = path.resolve(depDir, 'index.js')
-			if depFile
+			if depFile and path.extname(depFile) is '.js' 
 				newFile = new Vinyl
 					base: path.resolve 'node_modules'
 					cwd: cwd
-					path: depFile
+					path: if opt.flatten then path.join(depDir, path.basename(depFile)) else depFile
 					contents: fs.readFileSync depFile
 				pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 				stream.push newFile
