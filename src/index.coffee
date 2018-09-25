@@ -133,6 +133,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 	stream = through.obj (file, enc, next) ->
 		@push file
 		next()
+	originalPathMap = {}
 	pathMap = {}
 	cwd = process.cwd()
 	pkg = require path.resolve 'package.json'
@@ -172,14 +173,19 @@ module.exports.findPackageDependencies = (opt = {}) ->
 				newFile = new Vinyl
 					base: path.resolve 'node_modules'
 					cwd: cwd
-					path: if opt.flatten then path.join(depDir, path.basename(depFile)) else depFile
+					path: depFile
 					contents: fs.readFileSync depFile
-				pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+				if opt.flatten
+					originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+					newFile.path = path.join depDir, path.basename(depFile)
+					pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+				else
+					originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 				stream.push newFile
 	newFile = new Vinyl
 		base: cwd
 		cwd: cwd
 		path: path.join cwd, 'package-dependencies-paths.js'
-		contents: new Buffer 'var __package_dependencies_paths = ' + JSON.stringify(pathMap, null, 2) + ';'
+		contents: new Buffer 'var __package_dependencies_paths = ' + JSON.stringify(pathMap, null, 2) + ';\n' + (if opt.flatten then '/*' + JSON.stringify(originalPathMap, null, 2) + '*/\n' else '')
 	stream.end newFile
 	stream
