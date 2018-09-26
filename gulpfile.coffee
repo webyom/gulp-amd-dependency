@@ -15,7 +15,9 @@ gulp.task 'example', ->
 		base: 'package-dependencies'
 		ignore: ['amd-paths-collection']
 		paths:
-			'async': 'support/sync-package-managers'
+			'async':
+				'async': 'lib/async'
+				'async/support': 'support/sync-package-managers'
 	}).pipe gulp.dest 'example/package-dependencies'
 
 	console.log '"example/src/index.js" depends on:'

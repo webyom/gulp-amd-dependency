@@ -141,35 +141,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 		return if opt.ignore && opt.ignore.indexOf(dep) >= 0
 		depDir = path.resolve 'node_modules', dep
 		if fs.statSync(depDir).isDirectory()
-			depPkg = require path.resolve(depDir, 'package.json')
-			depFile = ''
-			if opt.paths && opt.paths[dep]
-				if typeof opt.paths[dep] is 'function'
-					depFile = path.resolve depDir, opt.paths[dep]()
-				else
-					depFile = path.resolve depDir, opt.paths[dep]
-				depFile = depFile + '.js'
-			else if amdPathsCollection[dep]
-				if typeof amdPathsCollection[dep] is 'function'
-					depFile = path.resolve depDir, amdPathsCollection[dep]()
-				else
-					depFile = path.resolve depDir, amdPathsCollection[dep]
-				depFile = depFile + '.js'
-			else if depPkg.browser and typeof depPkg.browser is 'string'
-				depFile = path.resolve depDir, depPkg.browser
-				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
-					depFile = depFile + '.js'
-			else if fs.existsSync path.resolve(depDir, 'dist', dep + '.js')
-				depFile = path.resolve(depDir, 'dist', dep + '.js')
-			else if depPkg.main and typeof depPkg.main is 'string'
-				depFile = path.resolve depDir, depPkg.main
-				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
-					depFile = depFile + '.js'
-			else if fs.existsSync path.resolve(depDir, dep + '.js')
-				depFile = path.resolve(depDir, dep + '.js')
-			else if fs.existsSync path.resolve(depDir, 'index.js')
-				depFile = path.resolve(depDir, 'index.js')
-			if depFile and path.extname(depFile) is '.js' 
+			pushStream = (dep, depFile) ->
 				contents = fs.readFileSync(depFile).toString()
 				sourceMap = contents.match /\/\/\s*#\s*sourceMappingURL=(.+)/
 				depFileDir = path.dirname depFile
@@ -194,6 +166,43 @@ module.exports.findPackageDependencies = (opt = {}) ->
 					originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 				stream.push newFile
 				stream.push sourceMapFile if sourceMapFile
+
+			depPkg = require path.resolve(depDir, 'package.json')
+			depFile = ''
+			converted = opt.paths && opt.paths[dep] || amdPathsCollection[dep]
+
+			if converted
+				if typeof converted is 'function'
+					depFile = path.resolve depDir, converted() + '.js'
+				else if typeof converted is 'object'
+					Object.keys(converted).filter((item) -> item is dep or item.indexOf(dep + '/') is 0).forEach (dep) ->
+						return if opt.ignore && opt.ignore.indexOf(dep) >= 0
+						if typeof converted[dep] is 'function'
+							depFile = path.resolve depDir, converted[dep]() + '.js'
+						else
+							depFile = path.resolve depDir, converted[dep] + '.js'
+						pushStream dep, depFile
+					return
+				else
+					depFile = path.resolve depDir, converted + '.js'
+			else if depPkg.browser and typeof depPkg.browser is 'string'
+				depFile = path.resolve depDir, depPkg.browser
+				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
+					depFile = depFile + '.js'
+			else if fs.existsSync path.resolve(depDir, 'dist', dep + '.js')
+				depFile = path.resolve(depDir, 'dist', dep + '.js')
+			else if depPkg.main and typeof depPkg.main is 'string'
+				depFile = path.resolve depDir, depPkg.main
+				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
+					depFile = depFile + '.js'
+			else if fs.existsSync path.resolve(depDir, dep + '.js')
+				depFile = path.resolve(depDir, dep + '.js')
+			else if fs.existsSync path.resolve(depDir, 'index.js')
+				depFile = path.resolve(depDir, 'index.js')
+
+			if depFile and path.extname(depFile) is '.js' 
+				pushStream dep, depFile
+
 	newFile = new Vinyl
 		base: cwd
 		cwd: cwd
