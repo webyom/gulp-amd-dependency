@@ -154,7 +154,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 							sourceMapFile = new Vinyl
 								base: path.resolve 'node_modules'
 								cwd: cwd
-								path: if opt.flatten then path.join(depDir, path.basename(sourceMapPath)) else sourceMapPath
+								path: sourceMapPath
 								contents: fs.readFileSync sourceMapPath
 						newFile = new Vinyl
 							base: path.resolve 'node_modules'
@@ -164,6 +164,8 @@ module.exports.findPackageDependencies = (opt = {}) ->
 					if opt.flatten
 						originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 						newFile.path = path.join depDir, path.basename(depFile)
+						if sourceMapFile
+							sourceMapFile.path = path.join depDir, path.basename(sourceMapFile.path)
 						pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 					else
 						originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
