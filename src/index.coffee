@@ -137,76 +137,103 @@ module.exports.findPackageDependencies = (opt = {}) ->
 	pathMap = {}
 	cwd = process.cwd()
 	pkg = require path.resolve 'package.json'
-	Object.keys(pkg.dependencies || []).forEach (dep) ->
-		return if opt.ignore && opt.ignore.indexOf(dep) >= 0
-		depDir = path.resolve 'node_modules', dep
-		if fs.statSync(depDir).isDirectory()
-			pushStream = (dep, depFile) ->
-				contents = fs.readFileSync(depFile).toString()
-				sourceMap = contents.match /\/\/\s*#\s*sourceMappingURL=(.+)/
-				depFileDir = path.dirname depFile
-				sourceMapPath = sourceMap && path.resolve(depFileDir, sourceMap[1].trim())
-				sourceMapFile = null
-				if sourceMapPath and fs.existsSync(sourceMapPath) and (!opt.flatten or depFileDir is path.dirname(sourceMapPath))
-					sourceMapFile = new Vinyl
-						base: path.resolve 'node_modules'
-						cwd: cwd
-						path: if opt.flatten then path.join(depDir, path.basename(sourceMapPath)) else sourceMapPath
-						contents: fs.readFileSync sourceMapPath
-				newFile = new Vinyl
-					base: path.resolve 'node_modules'
-					cwd: cwd
-					path: depFile
-					contents: new Buffer contents
-				if opt.flatten
-					originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
-					newFile.path = path.join depDir, path.basename(depFile)
-					pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
-				else
-					originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
-				stream.push newFile
-				stream.push sourceMapFile if sourceMapFile
+	async.each(
+		Object.keys(pkg.dependencies || []) 
+		(dep, cb) ->
+			return cb() if opt.ignore && opt.ignore.indexOf(dep) >= 0
+			depDir = path.resolve 'node_modules', dep
+			if fs.statSync(depDir).isDirectory()
+				pushStream = (dep, depFile, newFile, sourceMapFile) ->
+					if not newFile
+						contents = fs.readFileSync(depFile).toString()
+						sourceMap = contents.match /\/\/\s*#\s*sourceMappingURL=(.+)/
+						depFileDir = path.dirname depFile
+						sourceMapPath = sourceMap && path.resolve(depFileDir, sourceMap[1].trim())
+						sourceMapFile = null
+						if sourceMapPath and fs.existsSync(sourceMapPath) and (!opt.flatten or depFileDir is path.dirname(sourceMapPath))
+							sourceMapFile = new Vinyl
+								base: path.resolve 'node_modules'
+								cwd: cwd
+								path: if opt.flatten then path.join(depDir, path.basename(sourceMapPath)) else sourceMapPath
+								contents: fs.readFileSync sourceMapPath
+						newFile = new Vinyl
+							base: path.resolve 'node_modules'
+							cwd: cwd
+							path: depFile
+							contents: new Buffer contents
+					if opt.flatten
+						originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+						newFile.path = path.join depDir, path.basename(depFile)
+						pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+					else
+						originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+					stream.push newFile
+					stream.push sourceMapFile if sourceMapFile
 
-			depPkg = require path.resolve(depDir, 'package.json')
-			depFile = ''
-			converted = opt.paths && opt.paths[dep] || amdPathsCollection[dep]
+				depPkg = require path.resolve(depDir, 'package.json')
+				depFile = ''
+				converted = opt.paths && opt.paths[dep] || amdPathsCollection[dep]
 
-			if converted
-				if typeof converted is 'function'
-					depFile = path.resolve depDir, converted() + '.js'
-				else if typeof converted is 'object'
-					Object.keys(converted).filter((item) -> item is dep or item.indexOf(dep + '/') is 0).forEach (dep) ->
-						return if opt.ignore && opt.ignore.indexOf(dep) >= 0
-						if typeof converted[dep] is 'function'
-							depFile = path.resolve depDir, converted[dep]() + '.js'
-						else
-							depFile = path.resolve depDir, converted[dep] + '.js'
-						pushStream dep, depFile
-					return
-				else
-					depFile = path.resolve depDir, converted + '.js'
-			else if depPkg.browser and typeof depPkg.browser is 'string'
-				depFile = path.resolve depDir, depPkg.browser
-				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
-					depFile = depFile + '.js'
-			else if fs.existsSync path.resolve(depDir, 'dist', dep + '.js')
-				depFile = path.resolve(depDir, 'dist', dep + '.js')
-			else if depPkg.main and typeof depPkg.main is 'string'
-				depFile = path.resolve depDir, depPkg.main
-				if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
-					depFile = depFile + '.js'
-			else if fs.existsSync path.resolve(depDir, dep + '.js')
-				depFile = path.resolve(depDir, dep + '.js')
-			else if fs.existsSync path.resolve(depDir, 'index.js')
-				depFile = path.resolve(depDir, 'index.js')
+				if converted
+					if typeof converted is 'function'
+						return converted (err, file) ->
+							return cb(err) if err
+							if typeof file is 'string'
+								depFile = path.resolve depDir, file + '.js'
+								pushStream dep, depFile
+							else
+								depFile = file.path
+								pushStream dep, depFile, file
+							cb()
+					else if typeof converted is 'object'
+						return async.each(
+							Object.keys(converted).filter((item) -> item is dep or item.indexOf(dep + '/') is 0)
+							(dep, cb) ->
+								return cb() if opt.ignore && opt.ignore.indexOf(dep) >= 0
+								if typeof converted[dep] is 'function'
+									converted[dep] (err, file) ->
+										return cb(err) if err
+										if typeof file is 'string'
+											depFile = path.resolve depDir, file + '.js'
+											pushStream dep, depFile
+										else
+											depFile = file.path
+											pushStream dep, depFile, file
+										cb()
+								else
+									depFile = path.resolve depDir, converted[dep] + '.js'
+									pushStream dep, depFile
+									cb()
+							(err) ->
+								cb err
+						)
+					else
+						depFile = path.resolve depDir, converted + '.js'
+				else if depPkg.browser and typeof depPkg.browser is 'string'
+					depFile = path.resolve depDir, depPkg.browser
+					if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
+						depFile = depFile + '.js'
+				else if fs.existsSync path.resolve(depDir, 'dist', dep + '.js')
+					depFile = path.resolve(depDir, 'dist', dep + '.js')
+				else if depPkg.main and typeof depPkg.main is 'string'
+					depFile = path.resolve depDir, depPkg.main
+					if !fs.existsSync(depFile) && fs.existsSync(depFile + '.js')
+						depFile = depFile + '.js'
+				else if fs.existsSync path.resolve(depDir, dep + '.js')
+					depFile = path.resolve(depDir, dep + '.js')
+				else if fs.existsSync path.resolve(depDir, 'index.js')
+					depFile = path.resolve(depDir, 'index.js')
 
-			if depFile and path.extname(depFile) is '.js' 
-				pushStream dep, depFile
-
-	newFile = new Vinyl
-		base: cwd
-		cwd: cwd
-		path: path.join cwd, 'package-dependencies-paths.js'
-		contents: new Buffer 'var __package_dependencies_paths = ' + JSON.stringify(pathMap, null, 2) + ';\n' + (if opt.flatten then '/*' + JSON.stringify(originalPathMap, null, 2) + '*/\n' else '')
-	stream.end newFile
+				if depFile and path.extname(depFile) is '.js' 
+					pushStream dep, depFile
+			cb()
+		(err) ->
+			return stream.emit 'error', new PluginError('gulp-amd-dependency', err) if err
+			newFile = new Vinyl
+				base: cwd
+				cwd: cwd
+				path: path.join cwd, 'package-dependencies-paths.js'
+				contents: new Buffer 'var __package_dependencies_paths = ' + JSON.stringify(pathMap, null, 2) + ';\n' + (if opt.flatten then '/*' + JSON.stringify(originalPathMap, null, 2) + '*/\n' else '')
+			stream.end newFile
+	)
 	stream
