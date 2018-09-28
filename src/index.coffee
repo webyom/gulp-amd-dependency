@@ -6,7 +6,9 @@ async = require 'async'
 Vinyl = require 'vinyl'
 PluginError = require 'plugin-error'
 through = require 'through2'
-amdPathsCollection = require 'amd-paths-collection'
+amdPathsCollection = require require.resolve('amd-paths-collection',
+		paths: [path.resolve()].concat require.resolve.paths 'amd-paths-collection'
+	)
 
 EXTNAMES = ['.js', '.es6', '.coffee', '.jsx', '.tag', '.riot.html']
 
