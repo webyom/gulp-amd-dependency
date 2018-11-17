@@ -145,7 +145,10 @@ module.exports.findPackageDependencies = (opt = {}) ->
 			return cb() if opt.ignore && opt.ignore.indexOf(dep) >= 0
 			depDir = path.resolve 'node_modules', dep
 			if fs.statSync(depDir).isDirectory()
-				pushStream = (dep, depFile, newFile, sourceMapFile) ->
+				depPkg = require path.resolve(depDir, 'package.json')
+
+				pushStream = (dep, depFile, newFile) ->
+					version = opt.withVersion && depPkg.version || ''
 					if not newFile
 						contents = fs.readFileSync(depFile).toString()
 						sourceMap = contents.match /\/\/\s*#\s*sourceMappingURL=(.+)/
@@ -163,18 +166,21 @@ module.exports.findPackageDependencies = (opt = {}) ->
 							cwd: cwd
 							path: depFile
 							contents: new Buffer contents
+					originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 					if opt.flatten
-						originalPathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
-						newFile.path = path.join depDir, path.basename(depFile)
+						newFile.path = path.join depDir, version, path.basename(depFile)
 						if sourceMapFile
-							sourceMapFile.path = path.join depDir, path.basename(sourceMapFile.path)
+							sourceMapFile.path = path.join depDir, version, path.basename(sourceMapFile.path)
 						pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
 					else
-						originalPathMap[dep] = pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+						if version
+							newFile.path = path.join depDir, version, path.relative(depDir, newFile.path)
+							pathMap[dep] = path.join (opt.base || ''), path.relative(newFile.base, newFile.path).replace(/\.js$/i, '')
+						else
+							pathMap[dep] = originalPathMap[dep]
 					stream.push newFile
 					stream.push sourceMapFile if sourceMapFile
 
-				depPkg = require path.resolve(depDir, 'package.json')
 				depFile = ''
 				converted = opt.paths && opt.paths[dep] || amdPathsCollection[dep]
 
