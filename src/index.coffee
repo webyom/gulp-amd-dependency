@@ -139,6 +139,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 	pathMap = {}
 	cwd = process.cwd()
 	pkg = require path.resolve 'package.json'
+	collection = amdPathsCollection(opt.collectionOpt)
 	async.each(
 		Object.keys(pkg.dependencies || []) 
 		(dep, cb) ->
@@ -182,22 +183,23 @@ module.exports.findPackageDependencies = (opt = {}) ->
 					stream.push sourceMapFile if sourceMapFile
 
 				depFile = ''
-				converted = opt.paths && opt.paths[dep] || amdPathsCollection[dep]
+				converted = opt.paths && opt.paths[dep] || collection[dep]
 
 				if converted
 					if typeof converted is 'function'
-						return converted (err, file) ->
+						converted = converted (err, file) ->
 							return cb(err) if err
 							if typeof file is 'string'
 								depFile = path.resolve depDir, file + '.js'
 								pushStream dep, depFile
-							else
+							else if file
 								depFile = file.path
 								pushStream dep, depFile, file
 							cb()
-					else if typeof converted is 'object'
+						return if typeof converted not in ['object', 'string']
+					if converted and typeof converted is 'object'
 						return async.each(
-							Object.keys(converted).filter((item) -> item is dep or item.indexOf(dep + '/') is 0)
+							Object.keys(converted).filter((item) -> item is dep or not collection[item] and (item.indexOf(dep + '/') is 0 or item.indexOf(dep + '-') is 0 or item.indexOf(dep + '_') is 0))
 							(dep, cb) ->
 								return cb() if opt.ignore && opt.ignore.indexOf(dep) >= 0
 								if typeof converted[dep] is 'function'
@@ -217,7 +219,7 @@ module.exports.findPackageDependencies = (opt = {}) ->
 							(err) ->
 								cb err
 						)
-					else
+					else if typeof converted is 'string'
 						depFile = path.resolve depDir, converted + '.js'
 				else if depPkg.browser and typeof depPkg.browser is 'string'
 					depFile = path.resolve depDir, depPkg.browser
